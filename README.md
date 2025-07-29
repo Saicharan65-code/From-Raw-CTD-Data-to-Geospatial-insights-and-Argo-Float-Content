@@ -1,4 +1,4 @@
-# SeaSnap
+# 🌊 SeaSnap
 
 **From Raw CTD Data to Geospatial Insights and Argo Float Context**
 
@@ -20,6 +20,14 @@ SeaSnap is a comprehensive data pipeline and visualization platform for Conducti
   Implements quality control mechanisms inspired by Argo float data standards.  
   - Assigns QC flags to each parameter (e.g., temperature, salinity, conductivity).
 
+📈 QC Flags (Based on ARGO Standards)
+    Each parameter is assigned a quality flag:
+      -1: Good data
+      -2: Probably good
+      -3: Probably bad
+      -4: Bad data
+      -9: Missing value
+      
 - **Geospatial Visualization & Analytics**  
   - Interactive maps and plots to explore CTD data spatially and temporally.
   - Available plots include:
