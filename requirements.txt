@@ -2,3 +2,15 @@
 **Plotly.js (v2.12.1):** For scientific data plots.
 **PapaParse (v5.3.0):** For parsing CSV data files in the browser.
 **Leaflet.draw (v1.0.4):** A plugin for drawing selection tools on the map.
+pandas: DataFrame creation, CSV/Excel reading and writing
+numpy: Numerical operations, especially for QC thresholds and array logic
+os:File/folder path handling
+re:Regular expressions for parsing metadata and headers
+glob:Pattern matching to find files in folders
+datetime:Date/time parsing and formatting
+collections:Handling duplicate parameters, header uniqueness
+openpyxl:Reading .xlsx Excel files
+xlrd:Reading older .xls Excel files
+docx:Reading .docx Word documents for metadata tables
+csv:Parsing raw CSV rows inside gzip files
+rasterio:Reading ETOPO1 GeoTIFF to check "at sea" location
