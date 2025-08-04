@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sea Snap</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.12.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #1a1d21;
+            --surface-1: #25282e;
+            --surface-2: #30343c;
+            --border-color: #434750;
+            --text-primary: #e2e2e2;
+            --text-secondary: #a0a0a0;
+            --accent-primary: #3498db;
+            --accent-secondary: #2ecc71;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        
+        body.light-mode {
+            --bg-dark: #fbfaff;
+            --surface-1: #ffffff;
+            --surface-2: #f5f3f7;
+            --border-color: #e3e0e8;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --accent-primary: #7c3aed;
+            --accent-secondary: #3b82f6;
+        }
+
+        body {
+            font-family: var(--font-family);
+            margin: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            transition: margin-left 0.3s ease-in-out, background-color 0.3s, color 0.3s;
+        }
+
+        header {
+            background: var(--surface-1);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+        
+        body.light-mode header {
+            background: linear-gradient(100deg, var(--accent-primary), var(--accent-secondary));
+            color: #ffffff;
+            border-bottom-color: var(--accent-primary);
+        }
+        
+        .header-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .theme-toggle {
+            background: var(--surface-2);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            padding: 0;
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .theme-toggle:hover {
+            background-color: var(--surface-2);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .theme-toggle .icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        body.light-mode header .theme-toggle {
+            border-color: rgba(255, 255, 255, 0.6);
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        body.light-mode header .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #ffffff;
+        }
+
+        .view-switcher {
+            background-color: var(--bg-dark);
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .view-switcher-btn {
+            padding: 8px 16px; font-size: 14px; font-weight: 500;
+            border: 1px solid var(--border-color);
+            background-color: var(--surface-1);
+            color: var(--text-secondary);
+            border-radius: 8px; cursor: pointer; margin: 0 5px;
+            transition: all 0.2s ease;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .view-switcher-btn:hover { background-color: var(--surface-2); color: var(--text-primary); }
+        .view-switcher-btn.active {
+            background-color: var(--accent-primary);
+            color: white; border-color: var(--accent-primary);
+            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+        }
+        body.light-mode .view-switcher-btn.active {
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+        }
+
+        h2 { text-align: center; color: var(--text-primary); margin: 20px 0 15px 0; font-size: 22px; font-weight: 600; }
+        .icon { width: 1em; height: 1em; display: inline-block; vertical-align: middle; background-color: currentColor; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; }
+        
+        .loading-spinner {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(26, 29, 33, 0.85); z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(4px);
+        }
+        body.light-mode .loading-spinner {
+            background: rgba(255, 255, 255, 0.85);
+        }
+        .spinner { border: 4px solid var(--surface-2); border-top: 4px solid var(--accent-primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text { margin-top: 20px; font-size: 16px; color: var(--text-secondary); }
+        .progress-bar { width: 200px; height: 6px; background: var(--surface-2); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+        .progress-fill { width: 0; height: 100%; background: var(--accent-primary); transition: width 0.3s ease; }
+        
+        .dashboard-container { padding: 20px; }
+        .map-container { position: relative; height: calc(100vh - 125px); border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }
+        #map { height: 100%; width: 100%; background-color: #000; }
+        
+        .leaflet-draw {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-radius: 8px;
+        }
+        body.light-mode .leaflet-draw {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .leaflet-draw-toolbar {
+            border: 1px solid var(--border-color) !important;
+            border-radius: 8px !important;
+        }
+        .leaflet-draw-toolbar a {
+            background-color: var(--surface-1) !important;
+            border-radius: 6px !important;
+            color: var(--text-primary) !important;
+            transition: all 0.2s ease !important;
+            border: none !important;
+            margin: 4px;
+        }
+        .leaflet-draw-toolbar a:hover,
+        .leaflet-draw-toolbar a.leaflet-draw-activated {
+            background-color: var(--accent-primary) !important;
+            color: white !important;
+        }
+        .leaflet-draw-actions a {
+            color: var(--accent-primary) !important;
+            font-weight: bold;
+            font-size: 14px !important;
+            padding: 6px 12px !important;
+            line-height: 24px !important;
+        }
+        .leaflet-draw-actions a:hover {
+            background-color: var(--surface-2) !important;
+            color: #5dade2 !important;
+        }
+        body.light-mode .leaflet-draw-actions a:hover {
+            color: #6d28d9 !important;
+        }
+
+        .stats-overlay { position: absolute; bottom: 10px; left: 10px; background: rgba(37, 40, 46, 0.9); padding: 8px 12px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1000; font-size: 13px; border: 1px solid var(--border-color); }
+        body.light-mode .stats-overlay { background: rgba(255, 255, 255, 0.9); }
+        
+        .map-button {
+            position: absolute; 
+            z-index: 1001; 
+            background: var(--surface-1); 
+            color: var(--text-primary);
+            border: 1px solid var(--border-color); 
+            border-radius: 6px; 
+            padding: 6px 12px;
+            cursor: pointer; 
+            font-family: inherit; 
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3); 
+            transition: all 0.2s ease;
+            display: inline-flex; 
+            align-items: center; 
+            gap: 6px;
+        }
+        body.light-mode .map-button { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .map-button:hover { background-color: var(--surface-2); }
+        #reset-zoom-btn { top: 10px; right: 10px; }
+        
+        .map-button-group {
+            position: absolute;
+            top: 55px;
+            right: 10px;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .map-button-group .map-button {
+            position: static;
+        }
+
+        #download-selected-stations-btn {
+            background: var(--accent-secondary); color: white; border-color: var(--accent-secondary);
+        }
+        #download-selected-stations-btn:hover { background-color: #27ae60; }
+        body.light-mode #download-selected-stations-btn:hover { background-color: #2563eb; }
+        #download-selected-metadata-btn {
+            background: var(--accent-primary); color: white; border-color: var(--accent-primary);
+        }
+        #download-selected-metadata-btn:hover { background-color: #2980b9; }
+        body.light-mode #download-selected-metadata-btn:hover { background-color: #6d28d9; }
+
+
+        .legend-bar { position: absolute; right: 10px; background: var(--surface-1); border-radius: 8px; border: 1px solid var(--border-color); box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1001; padding: 12px 14px; width: 180px; }
+        #legend-bar { top: 125px; }
+        #argo-legend-bar { top: 320px; }
+        body.light-mode .legend-bar { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .legend-bar h4 { margin: 0 0 8px 0; font-size: 14px; color: var(--text-primary); font-weight: 600; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; }
+        .legend-bar .legend-item { display: flex; align-items: center; margin-bottom: 4px; font-size: 12px; cursor: pointer; padding: 3px 6px; border-radius: 4px; transition: all 0.2s ease; }
+        .legend-bar .legend-item:not(.active) { opacity: 0.4; }
+        .legend-bar .legend-item:hover { background-color: var(--surface-2); }
+        .legend-bar .legend-color { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; border: 1px solid rgba(0,0,0,0.1); }
+        .argo-legend-item { font-size: 12px; padding: 4px 0; display: flex; align-items: center; gap: 8px; }
+        .argo-legend-item .icon { color: #f39c12; }
+        #download-argo-btn { width: 100%; margin-top: 10px; background-color: #f39c12; color: white; border-color: #f39c12; }
+        #download-argo-btn:hover { background-color: #e67e22; }
+        
+        .stations-panel { position: fixed; top: 0; left: -360px; width: 360px; height: 100%; background: var(--bg-dark); z-index: 2000; display: flex; flex-direction: column; transition: transform 0.3s ease-in-out; border-right: 1px solid var(--border-color); }
+        .stations-panel.open { transform: translateX(360px); }
+        .stations-panel-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: var(--surface-1); border-bottom: 1px solid var(--border-color); font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .stations-panel-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); transition: color 0.2s; padding: 0; line-height: 1; }
+        .stations-panel-close:hover { color: var(--text-primary); }
+        .stations-search { padding: 10px 15px; border-bottom: 1px solid var(--border-color); }
+        #stations-search-input { width: 100%; padding: 8px 12px; border-radius: 5px; border: 1px solid var(--border-color); font-size: 14px; box-sizing: border-box; background: var(--surface-1); color: var(--text-primary); }
+        #stations-search-input::placeholder { color: var(--text-secondary); }
+        
+        .stations-panel-section { padding: 10px 15px; border-bottom: 1px solid var(--border-color); }
+        .section-header, .accordion-header { font-weight: 600; color: var(--text-primary); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .accordion-header { cursor: pointer; user-select: none; }
+        .accordion-icon { transition: transform 0.3s ease; }
+        .accordion-content { max-height: 500px; overflow: hidden; transition: max-height 0.4s ease-in-out, padding 0.4s ease-in-out, margin 0.4s ease-in-out; padding-top: 5px; }
+        .accordion-content.collapsed { max-height: 0; padding-top: 0; margin-bottom: -15px; }
+
+        .filter-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+        .filter-button, .sort-button { padding: 5px 10px; font-size: 12px; border: 1px solid var(--border-color); background: var(--surface-1); color: var(--text-secondary); border-radius: 15px; cursor: pointer; transition: all 0.2s ease; }
+        .filter-button:hover, .sort-button:hover { background: var(--surface-2); color: var(--text-primary); }
+        .filter-button.active, .sort-button.active { background: var(--accent-primary); color: white; border-color: var(--accent-primary); font-weight: 500; }
+        
+        .sort-buttons { display: flex; gap: 8px; }
+        .sort-button { flex-grow: 1; border-radius: 5px; }
+
+        .stations-stats .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+        .stat-item { display: flex; justify-content: space-between; padding: 3px 0; }
+        .stat-label { font-weight: 500; color: var(--text-secondary); }
+        .stat-value { color: var(--accent-primary); font-weight: 600; }
+        
+        .stations-list { flex-grow: 1; overflow-y: auto; }
+        .station-item { cursor: pointer; padding: 12px 15px; border-bottom: 1px solid var(--border-color); transition: background-color 0.2s ease; display: flex; justify-content: space-between; align-items: center; }
+        .station-item:hover { background-color: var(--surface-1); }
+        .station-item.active { background-color: var(--surface-2); border-left: 4px solid var(--accent-primary); padding-left: 11px; }
+        .station-name { font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+        .station-ship { font-size: 12px; font-weight: 500; }
+        .station-coords { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+        .download-station-btn { background: var(--surface-2); color: var(--text-secondary); border: none; border-radius: 4px; padding: 5px 9px; cursor: pointer; transition: all 0.2s ease; }
+        .download-station-btn:hover { background-color: var(--accent-primary); color: white; }
+        
+        .stations-toggle { position: fixed; top: 60px; left: 15px; width: 40px; height: 40px; background: var(--surface-1); border: 1px solid var(--border-color); border-radius: 50%; z-index: 1002; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; justify-content: center; align-items: center; font-size: 20px; transition: all 0.3s ease-in-out; color: var(--text-primary); }
+        body.light-mode .stations-toggle { box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .stations-toggle:hover { transform: scale(1.1); background: var(--surface-2); }
+        .stations-toggle.open { left: 375px; }
+
+        .plot-view-container { display: flex; flex-direction: column; height: calc(100vh - 125px); gap: 15px; }
+        #plot-view-header {
+            background: var(--surface-1); padding: 10px 20px; border-radius: 8px; 
+            border: 1px solid var(--border-color);
+        }
+        #plot-view-title { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+        #plot-view-subtitle { font-size: 14px; color: var(--text-secondary); }
+        
+        #plot-display-area { display: flex; flex-grow: 1; gap: 15px; }
+        #main-plot-wrapper { flex-grow: 1; display: flex; flex-direction: column; background: var(--surface-1); border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; }
+        #main-plot-header { padding: 10px 15px; border-bottom: 1px solid var(--border-color); }
+        #main-plot-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        #main-plot { flex-grow: 1; min-height: 300px; }
+        
+        #plot-thumbnails-wrapper { display: flex; flex-direction: column; gap: 10px; width: 220px; }
+        .thumbnail-card { background: var(--surface-1); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s ease; }
+        .thumbnail-card:hover { border-color: var(--accent-primary); background: var(--surface-2); }
+        .thumbnail-card.active { border-color: var(--accent-primary); background: var(--surface-2); box-shadow: 0 0 10px rgba(52, 152, 219, 0.3); }
+        body.light-mode .thumbnail-card.active { box-shadow: 0 0 10px rgba(124, 58, 237, 0.2); }
+        .thumbnail-title { font-weight: 500; font-size: 13px; margin-bottom: 5px; }
+        .thumbnail-desc { font-size: 11px; color: var(--text-secondary); }
+        .no-data-message, .plot-prompt-message { display: flex; align-items: center; justify-content: center; text-align: center; height: 100%; flex-direction: column; gap: 10px; padding: 40px; }
+        .no-data-message h3, .plot-prompt-message h3 { margin: 0; font-weight: 600; font-size: 18px; }
+        .no-data-message p, .plot-prompt-message p { margin: 0; color: var(--text-secondary); }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .custom-popup .leaflet-popup-content-wrapper { background: var(--surface-1); color: var(--text-primary); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); border: 1px solid var(--border-color); }
+        .custom-popup .leaflet-popup-close-button { color: var(--text-secondary) !important; }
+        .custom-popup .leaflet-popup-content { margin: 15px; font-size: 14px; }
+        .popup-content h4 { margin: 0 0 10px 0; font-size: 18px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+        .popup-info { margin-bottom: 8px; }
+        .popup-button { width: 100%; padding: 8px; margin-top: 10px; background: var(--accent-primary); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; transition: background-color 0.2s; }
+        .popup-button:hover { background: #2980b9; }
+        body.light-mode .popup-button:hover { background: #6d28d9; }
+        .popup-button.download-single { background: var(--accent-secondary); }
+        .popup-button.download-single:hover { background: #27ae60; }
+        body.light-mode .popup-button.download-single:hover { background: #2563eb; }
+        .popup-button.download-single-meta { background: var(--accent-primary); }
+        .popup-button.download-single-meta:hover { background: #2980b9; }
+        body.light-mode .popup-button.download-single-meta:hover { background: #6d28d9; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-title-group">
+            <span id="header-icon" class="icon"></span>
+            Interactive Oceanographic Dashboard
+        </div>
+        <button id="theme-toggle-btn" class="theme-toggle" title="Toggle theme">
+            <span id="theme-icon" class="icon"></span>
+        </button>
+    </header>
+
+    <div class="view-switcher">
+        <button id="map-view-btn" class="view-switcher-btn active" onclick="switchView('map')"><span class="icon" id="map-icon"></span>Map View</button>
+        <button id="plot-view-btn" class="view-switcher-btn" onclick="switchView('plots')"><span class="icon" id="plot-icon"></span>Plot View</button>
+    </div>
+
+    <button id="stations-toggle" class="stations-toggle" onclick="toggleStationsPanel()" title="Open stations panel">
+        <span id="stations-icon" class="icon"></span>
+    </button>
+
+    <div class="stations-panel" id="stations-panel">
+        <div class="stations-panel-header">
+            <span>Station Navigator</span>
+            <button class="stations-panel-close" onclick="toggleStationsPanel()" title="Close panel">&times;</button>
+        </div>
+        <div class="stations-search">
+            <input type="text" id="stations-search-input" placeholder="Search stations or ships..." oninput="debouncedFilterStations()" autocomplete="off">
+        </div>
+        
+
+        <div class="stations-panel-section">
+            <div class="accordion-header">
+                <span>Filter Options</span>
+                <span class="accordion-icon icon" id="filter-accordion-icon"></span>
+            </div>
+            <div class="accordion-content">
+                <div class="filter-buttons">
+                    <button class="filter-button active" onclick="setFilter('all')" data-filter="all">All</button>
+                    <button class="filter-button" onclick="setFilter('valid')" data-filter="valid">Valid Coords</button>
+                    <button class="filter-button" onclick="setFilter('invalid')" data-filter="invalid">Invalid Coords</button>
+                    <button class="filter-button" onclick="setFilter('zero')" data-filter="zero">Zero Coords</button>
+                </div>
+                <div class="filter-buttons depth-filters">
+                    <button class="filter-button" onclick="setFilter('depth-250')" data-filter="depth-250">Depth &lt; 250m</button>
+                    <button class="filter-button" onclick="setFilter('depth-500')" data-filter="depth-500">Depth &lt; 500m</button>
+                    <button class="filter-button" onclick="setFilter('depth-1000')" data-filter="depth-1000">Depth &lt; 1000m</button>
+                    <button class="filter-button" onclick="setFilter('depth-2000')" data-filter="depth-2000">Depth &lt; 2000m</button>
+                    <button class="filter-button" onclick="setFilter('depth-more-2000')" data-filter="depth-more-2000">Depth > 2000m</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="stations-stats" class="stations-panel-section"></div>
+        <div class="stations-list" id="stations-list"></div>
+    </div>
+    
+    <div id="map-view-content" class="dashboard-container">
+        <div class="map-container">
+            <button id="reset-zoom-btn" class="map-button" title="Reset map view to default"><span class="icon" id="reset-icon"></span>Reset Zoom</button>
+            <div class="map-button-group">
+                <button id="download-selected-stations-btn" class="map-button" title="Download data for selected/visible stations">
+                    <span class="icon" id="download-icon"></span>Download Data (<span id="selected-stations-count">0</span>)
+                </button>
+                <button id="download-selected-metadata-btn" class="map-button" title="Download metadata for selected/visible stations">
+                    <span class="icon" id="metadata-download-icon"></span>Download Metadata (<span id="selected-stations-count-meta">0</span>)
+                </button>
+            </div>
+            <div class="legend-bar" id="legend-bar">
+                <h4 title="Toggle Legend">Ships<span class="accordion-icon icon" id="legend-accordion-icon"></span></h4>
+                <div id="legend-content" class="accordion-content"></div>
+            </div>
+            <div class="legend-bar" id="argo-legend-bar" style="display: none;">
+                <h4 title="Toggle Argo Legend">Top 5 Argo Profiles<span class="accordion-icon icon" id="argo-legend-accordion-icon"></span></h4>
+                <div id="argo-legend-content" class="accordion-content"></div>
+                <button id="download-argo-btn" class="map-button">
+                    <span class="icon" id="argo-download-icon"></span>Download Details
+                </button>
+            </div>
+            <div id="map"></div>
+            <div class="stats-overlay">
+                <div id="map-stats">Loading stations...</div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="plot-view-content" class="dashboard-container" style="display: none;">
+         <div class="loading-spinner" id="loading" style="display:none;">
+            <div class="spinner"></div><div class="loading-text" id="loading-text">Initializing...</div>
+            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+
+        <div class="plot-view-container">
+            <div id="plot-view-header">
+                <div>
+                    <div id="plot-view-title">Station Plots</div>
+                    <div id="plot-view-subtitle">Select a station from the map or navigator to view its data</div>
+                </div>
+            </div>
+
+            <div id="plot-display-area">
+                <div id="main-plot-wrapper">
+                    <div id="main-plot-header">
+                        <div id="main-plot-title"></div>
+                    </div>
+                    <div id="main-plot"></div>
+                </div>
+                <div id="plot-thumbnails-wrapper"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    const ICONS = {
+        ocean: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5c2 2 4 2 6 0s4-2 6 0 4 2 6 0m-18 5c2 2 4 2 6 0s4-2 6 0 4 2 6 0"></path></svg>',
+        map: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>',
+        plot: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>',
+        chevronRight: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>',
+        chevronLeft: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>',
+        chevronDown: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>',
+        chevronUp: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>',
+        reset: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg>',
+        download: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
+        prompt: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 12a2 2 0 0 0 0 2.83l8.47 8.47a2 2 0 0 0 2.83 0l8.47-8.47a2 2 0 0 0 0-2.83l-8.47-8.47a2 2 0 0 0-2.83 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+        error: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+        sun: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>',
+        error: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+        sun: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>',
+        moon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>',
+        star: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>'
+    };
+
+    function setIcon(elementId, iconName) {
+        const el = document.getElementById(elementId);
+        if (el && ICONS[iconName]) {
+            el.style.maskImage = `url("data:image/svg+xml,${encodeURIComponent(ICONS[iconName])}")`;
+            el.style.webkitMaskImage = `url("data:image/svg+xml,${encodeURIComponent(ICONS[iconName])}")`;
+        }
+    }
+
+    let metadata = [], ctdData = [];
+    let map, activeMarker = null;
+    let stationMarkers = [];
+    let ctdDataIndex = {};
+    let shipColors = {};
+    let shipStationCounts = {};
+    let shipDisplayNameMap = {}; 
+    let visibleShips = new Set();
+    const colorPalette = ['#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990', '#dcbeff', '#9A6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#a9a9a9'];
+    let allStationsData = [];
+    let filteredStationsData = [];
+    let currentFilter = 'all';
+    let currentSearchQuery = '';
+    let currentSort = { key: 'Station', order: 'asc' };
+    let isPanelOpen = false;
+    let currentlySelectedTraceID = null;
+    let currentStationDataForPlots = [];
+    let drawnItems, selectedStationMarkers = [], isDrawingModeActive = false;
+    let activePlotConfig = null;
+
+    let argoFloatsData = [];
+    let argoLayerGroup;
+    let nearestArgoFloats = [];
+    
+    function generateMockArgoData() {
+        const centerLat = 11.5, centerLon = 79.5, range = 5, count = 150;
+        for (let i = 0; i < count; i++) {
+            argoFloatsData.push({
+                id: `ARGO_${2900000 + i}`,
+                lat: centerLat + (Math.random() - 0.5) * range * 2,
+                lon: centerLon + (Math.random() - 0.5) * range * 2
+            });
+        }
+    }
+
+
+    const goodDataColor = '#2ecc71';
+    const QC_OPTIONS = [
+        { value: '0', label: 'Flag 0 (No QC)', color: goodDataColor }, { value: '1', label: 'Flag 1 (Good)', color: goodDataColor },
+        { value: '2', label: 'Flag 2 (Probably good)', color: '#98df8a' }, { value: '3', label: 'Flag 3 (Correctable bad)', color: '#ff7f0e' },
+        { value: '4', label: 'Flag 4 (Bad)', color: '#d62728' }, { value: '9', label: 'Flag 9 (Missing)', color: '#bcbd22' }
+    ];
+    const plotQCMapping = {'plot-temp': 'TEMP_QC', 'plot-sal': 'PSAL_QC', 'plot-cond': 'flag', 'plot-ts': 'flag', 'plot-dens': 'flag'};
+
+const PLOT_CONFIG = [
+    { id: 'plot-temp', title: 'Temperature Profile', desc: 'Depth vs. Temp.', xVar: 't090C', yVar: 'depSM', xLabel: 'Temperature (°C)', yLabel: 'Depth (m)', reverseY: true },
+    { id: 'plot-sal', title: 'Salinity Profile', desc: 'Depth vs. Salinity', xVar: 'sal00', yVar: 'depSM', xLabel: 'Salinity (PSU)', yLabel: 'Depth (m)', reverseY: true },
+    { id: 'plot-cond', title: 'Conductivity Profile', desc: 'Depth vs. Cond.', xVar: 'c0mS/cm', yVar: 'depSM', xLabel: 'Conductivity (mS/cm)', yLabel: 'Depth (m)', reverseY: true },
+    { id: 'plot-ts', title: 'T-S Diagram', desc: 'Temp. vs. Salinity', xVar: 'sal00', yVar: 't090C', xLabel: 'Salinity (PSU)', yLabel: 'Temperature (°C)', reverseY: false }
+];
+
+    function init() { showLoading(true, "Initializing..."); initMap(); loadData(); }
+    function showLoading(show, text = "Loading...") { const loading = document.getElementById('loading'); loading.style.display = show ? 'flex' : 'none'; if (show) updateProgress(0, text); }
+    function updateProgress(percent, text) { document.getElementById('progress-fill').style.width = percent + '%'; document.getElementById('loading-text').textContent = text; }
+    
+    function loadData() {
+
+    updateProgress(10, "Loading station metadata...");
+    const metaParseConfig = { header: true, skipEmptyLines: true, bom: true, transformHeader: h => h.trim() };
+    const dataParseConfig = { header: true, skipEmptyLines: true, bom:true, dynamicTyping: true, transformHeader: h => h.trim() };
+
+    Promise.all([
+        fetchAndParse("meta_combined.csv", metaParseConfig, 25),
+        fetchAndParse("dataQC_table.csv", dataParseConfig, 50),
+        fetchAndParse("argo_data.csv", dataParseConfig, 75)
+    ])
+    .then(([metaResults, dataResults, argoResults]) => {
+        
+        argoFloatsData = argoResults.map(row => {
+            if (!row || !row.file) {
+                return null;
+            }
+            return {
+                id: row.file,
+                lat: row.latitude,
+                lon: row.longitude,
+                Date_time: row.date,
+                Date_update: row.date_update,
+                Ins: row.institution 
+            };
+        }).filter(Boolean);
+
+        metadata = metaResults;
+        const rawCtdData = dataResults;
+        
+        const missingVal = -9.99e-29;
+        ctdData = rawCtdData.filter(row => !Object.values(row).some(value => value === missingVal));
+
+        updateProgress(80, "Processing and Indexing Data...");
+        generateShipColors();
+        createDataIndex();
+        loadStationsData();
+        
+        updateProgress(100, "Finalizing Dashboard...");
+        setTimeout(() => {
+            showLoading(false);
+            updateMapStats();
+            updateLegend();
+            addStationMarkers();
+        }, 500);
+    }).catch(error => {
+        console.error("Data loading failed:", error);
+        showErrorMessage(error.message);
+        showLoading(false);
+    });
+}
+    
+    async function fetchAndParse(filename, config, progress) {
+        const response = await fetch(filename);
+        if (!response.ok) throw new Error(`Could not load ${filename}. Make sure it's in the same folder as the HTML file.`);
+        const text = await response.text();
+        if (!text.trim()) throw new Error(`${filename} is empty.`);
+        return new Promise(resolve => {
+            Papa.parse(text, {
+                ...config,
+                complete: results => {
+                    updateProgress(progress, `${filename} loaded.`);
+                    resolve(results.data);
+                }
+            });
+        });
+    }
+
+    
+    function normalizeShipNameKey(name) {
+        const defaultKey = 'unknown_ship';
+        if (!name || typeof name !== 'string') return defaultKey;
+
+        const lowerName = name.toLowerCase();
+        let canonicalName = lowerName;
+
+        if (lowerName.includes('sagar sampada')) {
+            canonicalName = 'sagar sampada';
+        } else if (lowerName.includes('sagar kanya')) {
+            canonicalName = 'sagar kanya';
+        } else if (lowerName.includes('sagar nidhi')) {
+            canonicalName = 'sagar nidhi';
+        }
+        
+        const key = canonicalName.replace(/[^a-z0-9]/g, '');
+        return (key && key !== 'nan') ? key : defaultKey;
+    }
+
+    function generateShipColors() {
+        shipStationCounts = {};
+        shipDisplayNameMap = {};
+        const uniqueShipKeys = new Set();
+
+        metadata.forEach(s => {
+            const shipKey = normalizeShipNameKey(s.Ship);
+            uniqueShipKeys.add(shipKey);
+
+            if (!shipDisplayNameMap[shipKey]) {
+                let displayName = 'Unknown Ship';
+                const originalName = String(s.Ship || '');
+                const lowerName = originalName.toLowerCase();
+
+                if (lowerName.includes('sagar sampada')) {
+                    displayName = 'Sagar Sampada';
+                } else if (lowerName.includes('sagar kanya')) {
+                    displayName = 'Sagar Kanya';
+                } else if (lowerName.includes('sagar nidhi')) {
+                    displayName = 'Sagar Nidhi';
+                } else {
+                    displayName = getValidName(originalName, 'Unknown Ship');
+                    if (displayName.endsWith('.')) {
+                        displayName = displayName.slice(0, -1);
+                    }
+                    displayName = displayName.trim();
+                }
+                shipDisplayNameMap[shipKey] = displayName;
+            }
+        });
+
+        visibleShips = new Set(Array.from(uniqueShipKeys));
+        Array.from(uniqueShipKeys).forEach((shipKey, index) => {
+            shipColors[shipKey] = colorPalette[index % colorPalette.length];
+        });
+
+        metadata.forEach(station => {
+            const shipKey = normalizeShipNameKey(station.Ship);
+            shipStationCounts[shipKey] = (shipStationCounts[shipKey] || 0) + 1;
+        });
+    }
+
+    function createDataIndex() {
+        ctdDataIndex = ctdData.reduce((acc, row) => {
+            const traceID = row.TraceID ? String(row.TraceID).trim() : null;
+            if (traceID) {
+                if (!acc[traceID]) acc[traceID] = [];
+                acc[traceID].push(row);
+            }
+            return acc;
+        }, {});
+    }
+    
+    function initMap() {
+        map = L.map('map', {preferCanvas: true}).setView([11.5, 79.5], 7);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        argoLayerGroup = L.featureGroup().addTo(map);
+
+        drawnItems = new L.FeatureGroup().addTo(map);
+        const drawControl = new L.Control.Draw({
+            edit: { featureGroup: drawnItems, remove: true },
+            draw: { polyline: false, marker: false, circlemarker: false, circle: true, polygon: true, rectangle: true }
+        });
+        map.addControl(drawControl);
+
+        map.on('zoomend', () => {
+            const zoom = map.getZoom(), size = getMarkerSizeForZoom(zoom);
+            stationMarkers.forEach(marker => {
+                const station = allStationsData.find(s => s.TraceID === marker.options.traceID);
+                if (station) {
+                    const shipKey = normalizeShipNameKey(station.Ship);
+                    const shipColor = getShipColor(shipKey);
+                    const isActive = activeMarker === marker || selectedStationMarkers.includes(marker);
+                    const currentSize = isActive ? size + 4 : size;
+                    marker.setIcon(createMarkerIcon(shipColor, isActive, currentSize));
+                }
+            });
+        });
+
+        map.on(L.Draw.Event.CREATED, e => {
+            drawnItems.clearLayers().addLayer(e.layer);
+            isDrawingModeActive = true;
+            highlightStationsInDrawnArea(e.layer);
+        });
+
+        map.on(L.Draw.Event.EDITED, (e) => {
+            const layers = e.layers;
+            layers.eachLayer(layer => { highlightStationsInDrawnArea(layer); });
+        });
+
+        map.on(L.Draw.Event.DELETED, () => {
+            isDrawingModeActive = false;
+            clearStationSelection();
+        });
+        
+        map.on('click', (e) => {
+            if (e.originalEvent.target.classList.contains('leaflet-container')) {
+                 clearStationSelection();
+            }
+        });
+
+        map.on('zoomend moveend', updateDownloadButtonState);
+    }
+    
+    function getMarkerSizeForZoom(zoom) {
+        if (zoom >= 14) return 8;
+        if (zoom >= 11) return 12;
+        if (zoom >= 8) return 16;
+        if (zoom >= 5) return 12;
+        return 8;
+    }
+
+    function addStationMarkers() {
+        stationMarkers.forEach(marker => map.removeLayer(marker));
+        stationMarkers = [];
+
+        const zoom = map.getZoom();
+        const size = getMarkerSizeForZoom(zoom);
+
+        allStationsData.forEach(station => {
+            const shipKey = normalizeShipNameKey(station.Ship);
+
+            if (
+                station.coordinateStatus !== 'valid' ||
+                !visibleShips.has(shipKey) ||
+                (station.SEA_QC && parseInt(station.SEA_QC, 10) > 2) ||
+                station.parsedLat < -40 || station.parsedLat > 30 ||
+                station.parsedLon < 20 || station.parsedLon > 160
+            ) {
+                return;
+            }
+
+            const { parsedLat, parsedLon, TraceID } = station;
+            const shipColor = getShipColor(shipKey);
+
+            const marker = L.marker([parsedLat, parsedLon], {
+                icon: createMarkerIcon(shipColor, false, size),
+                traceID: TraceID
+            }).addTo(map);
+
+            marker.bindPopup(createPopupContent(station), { maxWidth: 300, className: 'custom-popup' });
+            marker.on('click', () => handleMarkerClick(marker));
+            stationMarkers.push(marker);
+        });
+
+        updateDownloadButtonState();
+    }
+    function handleMarkerClick(marker) {
+        const station = allStationsData.find(s => s.TraceID === marker.options.traceID); if (!station) return;
+        highlightMarker(marker);
+        if (isPanelOpen) { selectStation(station.TraceID); const stationItem = document.querySelector(`.station-item[data-trace-id="${station.TraceID}"]`); stationItem?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    }
+    function highlightMarker(markerToHighlight) {
+        const zoom = map.getZoom(), size = getMarkerSizeForZoom(zoom);
+        if (activeMarker && activeMarker !== markerToHighlight) {
+            const oldStation = allStationsData.find(s => s.TraceID === activeMarker.options.traceID);
+            if (oldStation) {
+                const oldShipKey = normalizeShipNameKey(oldStation.Ship);
+                const oldColor = getShipColor(oldShipKey);
+                if (!selectedStationMarkers.includes(activeMarker)) {
+                    activeMarker.setIcon(createMarkerIcon(oldColor, false, size));
+                }
+            }
+        }
+        activeMarker = markerToHighlight; const station = allStationsData.find(s => s.TraceID === activeMarker.options.traceID);
+        if (station) { 
+            const shipKey = normalizeShipNameKey(station.Ship);
+            const shipColor = getShipColor(shipKey); 
+            activeMarker.setIcon(createMarkerIcon(shipColor, true, size + 4)); 
+            selectStation(station.TraceID); 
+        }
+    }
+
+    function createMarkerIcon(color, isActive = false, size = 18) {
+        if (isActive) {
+            return L.divIcon({
+                className: 'custom-marker-active',
+                html: `<div style="background: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; border: 4px solid #FFD700; box-shadow: 0 4px 15px rgba(255,215,0,0.6); animation: pulse 1.5s infinite;"></div>`,
+                iconSize: [size + 8, size + 8], iconAnchor: [(size + 8) / 2, (size + 8) / 2]
+            });
+        }
+        return L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="background: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
+            iconSize: [size, size], iconAnchor: [size / 2, size / 2]
+        });
+    }
+
+    
+    function createArgoMarkerIcon() {
+        return L.divIcon({
+            className: 'argo-marker',
+            html: `<div class="icon" style="color: #f39c12; font-size: 24px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));"></div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+    }
+
+
+    function toggleStationsPanel() {
+        isPanelOpen = !isPanelOpen; const panel = document.getElementById('stations-panel'); const toggleButton = document.getElementById('stations-toggle');
+        panel.classList.toggle('open', isPanelOpen); toggleButton.classList.toggle('open', isPanelOpen);
+        setIcon('stations-icon', isPanelOpen ? 'chevronLeft' : 'chevronRight');
+        toggleButton.title = isPanelOpen ? 'Close stations panel (Esc)' : 'Open stations panel';
+        setTimeout(() => { if (map) map.invalidateSize(); }, 350);
+    }
+    
+    function loadStationsData() {
+        allStationsData = metadata.map(station => {
+             if (station.TraceID) {
+                  station.TraceID = String(station.TraceID).trim();
+            }
+            const parsedLat = parseFloat(station.Latitude), parsedLon = parseFloat(station.Longitude);
+            let coordinateStatus = 'invalid'; if (!isNaN(parsedLat) && !isNaN(parsedLon)) { coordinateStatus = (parsedLat === 0 && parsedLon === 0) ? 'zero' : 'valid'; }
+            
+            const { minDepth, maxDepth } = calculateDepthRange(station);
+            return { ...station, parsedLat, parsedLon, coordinateStatus, minDepth, maxDepth };
+        }); 
+        refreshStationsData();
+    }
+
+    function refreshStationsData() {
+        const query = currentSearchQuery.toLowerCase().trim();
+        filteredStationsData = allStationsData.filter(s => {
+            const shipKey = normalizeShipNameKey(s.Ship);
+            const displayName = shipDisplayNameMap[shipKey] || '';
+            const matchesSearch = !query || (getValidName(s.Station, '').toLowerCase().includes(query)) || (displayName.toLowerCase().includes(query));
+            if (!matchesSearch) return false; if (currentFilter === 'all') return true;
+            if (currentFilter.startsWith('depth-')) {
+                const value = parseInt(currentFilter.split('-').pop(), 10); if (currentFilter.includes('more')) return s.maxDepth > value;
+                return s.maxDepth > 0 && s.maxDepth < value;
+            } return s.coordinateStatus === currentFilter;
+        });
+        filteredStationsData.sort((a, b) => {
+            const key = currentSort.key;
+            let valA, valB;
+            if (key === 'Ship') {
+                valA = shipDisplayNameMap[normalizeShipNameKey(a.Ship)] || '';
+                valB = shipDisplayNameMap[normalizeShipNameKey(b.Ship)] || '';
+            } else {
+                valA = a[key];
+                valB = b[key];
+            }
+            if (typeof valA === 'number' && typeof valB === 'number') { return currentSort.order === 'asc' ? valA - valB : valB - valA; }
+            valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase();
+            if (valA < valB) return currentSort.order === 'asc' ? -1 : 1; if (valA > valB) return currentSort.order === 'asc' ? 1 : -1;
+            return 0;
+        }); renderStationsList(); updateStationsPanelStats();
+    }
+    function renderStationsList() {
+        const listContainer = document.getElementById('stations-list'); if (filteredStationsData.length === 0) { listContainer.innerHTML = '<div class="no-stations-message">No stations match criteria.</div>'; return; }
+        const fragment = document.createDocumentFragment();
+        filteredStationsData.forEach(station => {
+            const stationDiv = document.createElement('div'); stationDiv.className = 'station-item'; stationDiv.dataset.traceId = station.TraceID;
+            const shipKey = normalizeShipNameKey(station.Ship);
+            const shipColor = getShipColor(shipKey);
+            const displayName = shipDisplayNameMap[shipKey] || 'N/A';
+            stationDiv.innerHTML = `<div><div class="station-name">${getValidName(station.Station, 'Unnamed')}</div><div class="station-ship" style="color: ${shipColor};">Ship: ${displayName}</div><div class="station-coords">Coords: ${station.coordinateStatus === 'valid' ? `${station.parsedLat.toFixed(3)}°N, ${station.parsedLon.toFixed(3)}°E` : 'Invalid'} | Depth: ${getDepthDisplay(station)}</div></div><button class="download-station-btn" onclick="event.stopPropagation(); downloadSingleStationData('${station.TraceID}')"><span class="icon" style="background-color: var(--text-secondary);"></span></button>`;
+            stationDiv.querySelector('.icon').style.maskImage = `url("data:image/svg+xml,${encodeURIComponent(ICONS.download)}")`; stationDiv.querySelector('.icon').style.webkitMaskImage = `url("data:image/svg+xml,${encodeURIComponent(ICONS.download)}")`;
+            stationDiv.addEventListener('click', () => { 
+                const marker = stationMarkers.find(m => m.options.traceID === station.TraceID);
+                if (marker) {
+                    highlightMarker(marker); 
+                    marker.openPopup();
+                } else {
+                    selectStation(station.TraceID); 
+                }
+            }); fragment.appendChild(stationDiv);
+        }); listContainer.innerHTML = ''; listContainer.appendChild(fragment);
+    }
+    function setFilter(filterType) { currentFilter = filterType; document.querySelectorAll('.filter-button').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === filterType)); refreshStationsData(); }
+    function setSort(sortKey) {
+        const btnMap = {'Station': 'sort-name-btn', 'Ship': 'sort-ship-btn', 'maxDepth': 'sort-depth-btn'}, baseNames = {'Station': 'Name', 'Ship': 'Ship', 'maxDepth': 'Depth'};
+        if (currentSort.key === sortKey) { currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc'; } else { currentSort.key = sortKey; currentSort.order = 'asc'; }
+        document.querySelectorAll('.sort-button').forEach(btn => { btn.classList.remove('active'); Object.keys(baseNames).forEach(key => { if (btn.id === btnMap[key] && key !== sortKey) { btn.textContent = baseNames[key]; } }); });
+        const activeBtn = document.getElementById(btnMap[sortKey]); if(activeBtn) { activeBtn.classList.add('active'); const arrow = currentSort.order === 'asc' ? '🔼' : '🔽'; activeBtn.textContent = `${baseNames[sortKey]} ${arrow}`; } refreshStationsData();
+    }
+    const debouncedFilterStations = debounce(() => { currentSearchQuery = document.getElementById('stations-search-input').value; refreshStationsData(); }, 250);
+    function downloadSingleStationData(traceID) { const stationData = ctdDataIndex[traceID] || []; if (stationData.length === 0) { alert('No CTD data for this station.'); return; } const stationMeta = allStationsData.find(s => s.TraceID === traceID); const stationName = getValidName(stationMeta?.Station, 'Station').replace(/[^a-z0-9]/gi, '_'); exportToCsv(stationData, `CTD_Data_${stationName}_${traceID}.csv`); }
+    
+    function downloadSingleStationMetadata(traceID) {
+        const stationMeta = allStationsData.find(s => s.TraceID === traceID);
+        if (!stationMeta) { alert('Could not find metadata for this station.'); return; }
+        const stationName = getValidName(stationMeta?.Station, 'Station').replace(/[^a-z0-9]/gi, '_');
+        exportToCsv([stationMeta], `CTD_Metadata_${stationName}_${traceID}.csv`);
+    }
+
+    function downloadSelectedStationsData() {
+        const markers = getCurrentlySelectedMarkers();
+        if (markers.length === 0) { alert('No stations selected or visible.'); return; }
+        const traceIDs = markers.map(marker => marker.options.traceID);
+        const combinedData = traceIDs.flatMap(id => ctdDataIndex[id] || []);
+        if (combinedData.length === 0) { alert('No CTD data for selected stations.'); return; }
+        const prefix = isDrawingModeActive ? "SelectedStations" : "VisibleStations";
+        exportToCsv(combinedData, `CTD_Data_${prefix}_${markers.length}.csv`);
+    }
+    
+    function downloadSelectedMetadata() {
+        const markers = getCurrentlySelectedMarkers();
+        if (markers.length === 0) { alert('No stations selected or visible.'); return; }
+        const traceIDs = markers.map(m => m.options.traceID);
+        const combinedMetadata = allStationsData.filter(s => traceIDs.includes(s.TraceID));
+        if (combinedMetadata.length === 0) { alert('No metadata for selected stations.'); return; }
+        const prefix = isDrawingModeActive ? "SelectedStations" : "VisibleStations";
+        exportToCsv(combinedMetadata, `CTD_Metadata_${prefix}_${markers.length}.csv`);
+    }
+
+    function getCurrentlySelectedMarkers() {
+        if (isDrawingModeActive && selectedStationMarkers.length > 0) {
+            return selectedStationMarkers;
+        }
+        const bounds = map.getBounds();
+        return stationMarkers.filter(m => bounds.contains(m.getLatLng()));
+    }
+
+    function highlightStationsInDrawnArea(drawnLayer) {
+        clearStationSelection(); 
+        selectedStationMarkers = [];
+        const zoom = map.getZoom();
+        const activeSize = getMarkerSizeForZoom(zoom) + 4;
+
+        stationMarkers.forEach(marker => {
+            if (isMarkerInLayer(marker, drawnLayer)) {
+                selectedStationMarkers.push(marker);
+                const station = allStationsData.find(s => s.TraceID === marker.options.traceID);
+                if (station) {
+                    const shipKey = normalizeShipNameKey(station.Ship);
+                    const shipColor = getShipColor(shipKey);
+                    marker.setIcon(createMarkerIcon(shipColor, true, activeSize));
+                }
+            }
+        });
+        updateDownloadButtonState();
+    }
+
+    function clearStationSelection() {
+        
+        clearArgoDisplay();
+
+        const zoom = map.getZoom();
+        const normalSize = getMarkerSizeForZoom(zoom);
+        
+        
+        if (activeMarker) {
+             const oldStation = allStationsData.find(s => s.TraceID === activeMarker.options.traceID);
+             if (oldStation) {
+                const oldShipKey = normalizeShipNameKey(oldStation.Ship);
+                const oldColor = getShipColor(oldShipKey);
+                activeMarker.setIcon(createMarkerIcon(oldColor, false, normalSize));
+             }
+             activeMarker.closePopup();
+             activeMarker = null;
+        }
+        currentlySelectedTraceID = null;
+        
+        selectedStationMarkers.forEach(marker => {
+            const station = allStationsData.find(s => s.TraceID === marker.options.traceID);
+            if (station) {
+                const shipKey = normalizeShipNameKey(station.Ship);
+                const shipColor = getShipColor(shipKey);
+                marker.setIcon(createMarkerIcon(shipColor, false, normalSize));
+            }
+        });
+        selectedStationMarkers = [];
+        updateDownloadButtonState();
+    }
+
+    function isMarkerInLayer(marker, layer) {
+        const latLng = marker.getLatLng();
+        if (layer instanceof L.Rectangle || layer instanceof L.Polygon) {
+            return layer.getBounds().contains(latLng);
+        }
+        if (layer instanceof L.Circle) {
+            return layer.getLatLng().distanceTo(latLng) <= layer.getRadius();
+        }
+        return false;
+    }
+    
+    function toggleShipVisibility(shipKey) { visibleShips.has(shipKey) ? visibleShips.delete(shipKey) : visibleShips.add(shipKey); addStationMarkers(); updateLegend(); }
+    
+    function getValidName(name, defaultName) { const strName = String(name || '').trim(); return (strName && strName.toLowerCase() !== 'nan') ? strName : defaultName; }
+    function updateDownloadButtonState() {
+        const btn = document.getElementById('download-selected-stations-btn');
+        const metaBtn = document.getElementById('download-selected-metadata-btn');
+        const countEl = document.getElementById('selected-stations-count');
+        const metaCountEl = document.getElementById('selected-stations-count-meta');
+        const selection = getCurrentlySelectedMarkers();
+        const displayStyle = selection.length > 0 ? 'inline-flex' : 'none';
+        
+        countEl.textContent = selection.length;
+        metaCountEl.textContent = selection.length;
+        btn.style.display = displayStyle;
+        metaBtn.style.display = displayStyle;
+    }
+    function updateStationsPanelStats() {
+        const total = allStationsData.length, showing = filteredStationsData.length;
+        const stats = filteredStationsData.reduce((acc, s) => { acc[s.coordinateStatus] = (acc[s.coordinateStatus] || 0) + 1; return acc; }, { valid: 0, invalid: 0, zero: 0 });
+        document.getElementById('stations-stats').innerHTML = `<div class="stats-grid"><div class="stat-item"><span class="stat-label">Showing:</span> <span class="stat-value">${showing}/${total}</span></div></div>`;
+    }
+    function updateMapStats() { document.getElementById('map-stats').innerHTML = `<div><strong>Total Stations:</strong> ${metadata.length}</div><div><strong>On Map:</strong> ${allStationsData.filter(s => s.coordinateStatus === 'valid').length}</div><div><strong>Argo Profiles:</strong> ${argoFloatsData.length}</div>`; }
+    function updateLegend() {
+        const sortedShipKeys = Object.keys(shipStationCounts).sort((a, b) => shipStationCounts[b] - shipStationCounts[a]);
+        document.getElementById('legend-content').innerHTML = sortedShipKeys.map(shipKey => {
+            const displayName = shipDisplayNameMap[shipKey] || 'Unknown Ship';
+            const count = shipStationCounts[shipKey];
+            return `<div class="legend-item ${visibleShips.has(shipKey) ? 'active' : ''}" onclick="toggleShipVisibility('${shipKey}')"><div class="legend-color" style="background-color: ${getShipColor(shipKey)}"></div>${displayName} (${count})</div>`
+        }).join('');
+    }
+    function createPopupContent(station) {
+        const { Station, 'Cruise_ID': cruiseId, parsedLat, parsedLon, TraceID, Ship } = station;
+        const shipKey = normalizeShipNameKey(Ship);
+        const displayName = shipDisplayNameMap[shipKey] || 'N/A';
+        const shipColor = getShipColor(shipKey);
+        return `<div class="popup-content"><h4>${getValidName(Station, 'Station')}</h4><div class="popup-info"><strong>Ship:</strong> <span style="color: ${shipColor}; font-weight: bold;">${displayName}</span></div><div class="popup-info"><strong>CruiseId:</strong> ${getValidName(cruiseId, 'N/A')}</div><div class="popup-info"><strong>Coords:</strong> ${parsedLat.toFixed(3)}°N, ${parsedLon.toFixed(3)}°E</div><div class="popup-info"><strong>Depth Range:</strong> ${getDepthDisplay(station)}</div><button class="popup-button" onclick="selectStation('${TraceID}'); switchView('plots');">View Data Plots</button><button class="popup-button download-single" onclick="downloadSingleStationData('${TraceID}')">Download Station Data</button><button class="popup-button download-single-meta" onclick="downloadSingleStationMetadata('${TraceID}')">Download Metadata</button></div>`;
+    }
+    function getShipColor(shipKey) { return shipColors[shipKey] || '#808080'; }
+    
+    function calculateDepthRange(station) {
+        const stationProfileData = ctdDataIndex[String(station.TraceID).trim()];
+        if (!stationProfileData || stationProfileData.length === 0) {
+            return { minDepth: 0, maxDepth: 0 };
+        }
+        
+        let minDepth = Infinity;
+        let maxDepth = 0;
+
+        stationProfileData.forEach(row => {
+            const depth = parseFloat(row.depSM || 0);
+            if (!isNaN(depth)) {
+                if (depth < minDepth) minDepth = depth;
+                if (depth > maxDepth) maxDepth = depth;
+            }
+        });
+        
+        return { minDepth, maxDepth };
+    }
+
+    function getDepthDisplay(station) { 
+        if (station.maxDepth > 0) {
+            return `<span style="color:var(--accent-primary);font-weight:bold;">${station.minDepth.toFixed(1)}m - ${station.maxDepth.toFixed(1)}m</span>`;
+        }
+        return '<span style="color:#999;">No profile</span>'; 
+    }
+
+    function debounce(func, delay) { let timeout; return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), delay); }; }
+    function exportToCsv(data, filename) { const csv = Papa.unparse(data); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); URL.revokeObjectURL(link.href); }
+
+    
+    function updatePlotTheme() {
+        const isPlotView = document.getElementById('plot-view-content').style.display !== 'none';
+        if (isPlotView && activePlotConfig) {
+            displayMainPlot(activePlotConfig);
+        }
+    }
+
+    function setTheme(theme) {
+        if (theme === 'light') {
+            document.body.classList.add('light-mode');
+            setIcon('theme-icon', 'moon');
+            localStorage.setItem('theme', 'light');
+        } else {
+            document.body.classList.remove('light-mode');
+            setIcon('theme-icon', 'sun');
+            localStorage.setItem('theme', 'dark');
+        }
+        setTimeout(updatePlotTheme, 50);
+    }
+    
+    function showErrorMessage(msg) {
+        const container = document.getElementById('map-view-content') || document.body;
+        container.innerHTML = `<div class="no-data-message" style="border-color: #d62728; height: 80vh;">
+            <span class="icon" id="error-icon" style="color:#d62728; width: 48px; height: 48px; background-color: currentColor;"></span>
+            <h3>Application Error</h3>
+            <p style="max-width: 600px; text-align: center;">${msg}</p>
+        </div>`;
+        setIcon('error-icon', 'error');
+    }
+    function switchView(viewName) {
+        const mapView = document.getElementById('map-view-content');
+        const plotView = document.getElementById('plot-view-content');
+        const mapBtn = document.getElementById('map-view-btn');
+        const plotBtn = document.getElementById('plot-view-btn');
+        const stationToggle = document.getElementById('stations-toggle');
+        if (viewName === 'map') {
+            mapView.style.display = 'block'; plotView.style.display = 'none';
+            mapBtn.classList.add('active'); plotBtn.classList.remove('active');
+            stationToggle.style.display = 'flex';
+            if (isPanelOpen) { setIcon('stations-icon', 'chevronLeft'); } else { setIcon('stations-icon', 'chevronRight'); }
+            setTimeout(() => map.invalidateSize(), 10);
+        } else {
+            mapView.style.display = 'none'; plotView.style.display = 'block';
+            mapBtn.classList.remove('active'); plotBtn.classList.add('active');
+            stationToggle.style.display = 'none';
+            if (currentlySelectedTraceID) { showPlots(currentlySelectedTraceID); }
+        }
+    }
+
+    
+    function selectStation(traceID) {
+        if (!traceID) {
+            clearArgoDisplay();
+            return;
+        }
+
+        
+        if (currentlySelectedTraceID === traceID) return;
+
+        currentlySelectedTraceID = traceID;
+        
+        
+        document.querySelectorAll('.station-item').forEach(item => { item.classList.toggle('active', item.dataset.traceId === traceID); });
+        
+        const stationData = allStationsData.find(s => s.TraceID === traceID);
+        
+        
+        clearArgoDisplay(); 
+        if (stationData?.coordinateStatus === 'valid') {
+            nearestArgoFloats = findNearestArgoFloats(stationData, 5);
+            displayArgoConnections(stationData, nearestArgoFloats);
+            
+            
+            const marker = stationMarkers.find(m => m.options.traceID === traceID);
+            if (marker) {
+                 map.setView(marker.getLatLng(), Math.max(map.getZoom(), 10));
+                 if (!marker.isPopupOpen()) {
+                    marker.openPopup();
+                 }
+                
+                 const stationListItem = document.querySelector(`.station-item[data-trace-id="${traceID}"]`);
+                 stationListItem?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+        
+        
+        if (document.getElementById('plot-view-btn').classList.contains('active')) {
+            showPlots(traceID); 
+        }
+    }
+    
+    
+    function haversineDistance(coords1, coords2) {
+        function toRad(x) {
+            return x * Math.PI / 180;
+        }
+
+        const lon1 = coords1.lon;
+        const lat1 = coords1.lat;
+        const lon2 = coords2.lon;
+        const lat2 = coords2.lat;
+
+        const R = 6371;
+
+        const x1 = lat2 - lat1;
+        const dLat = toRad(x1);
+        const x2 = lon2 - lon1;
+        const dLon = toRad(x2)
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const d = R * c;
+
+        return d;
+    }
+
+    
+    function findNearestArgoFloats(station, k) {
+        const stationCoords = { lat: station.parsedLat, lon: station.parsedLon };
+        
+        return argoFloatsData
+            .map(float => {
+                const floatCoords = { lat: float.lat, lon: float.lon };
+                const distance = haversineDistance(stationCoords, floatCoords);
+                return { ...float, distance };
+            })
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, k);
+    }
+    
+    
+    function displayArgoConnections(station, floats) {
+        if (!station || floats.length === 0) return;
+        
+        const stationLatLng = [station.parsedLat, station.parsedLon];
+        
+        floats.forEach(float => {
+            const floatLatLng = [float.lat, float.lon];
+            
+           
+            const argoMarker = L.marker(floatLatLng, { icon: createArgoMarkerIcon() })
+                .bindPopup(`<b>Argo Profile file name:</b> ${float.id}<br><b>Distance:</b> ${float.distance.toFixed(2)} km`)
+                .addTo(argoLayerGroup);
+            
+            const iconDiv = argoMarker._icon.querySelector('.icon');
+            if (iconDiv) {
+                iconDiv.style.maskImage = `url("data:image/svg+xml,${encodeURIComponent(ICONS.star)}")`;
+                iconDiv.style.webkitMaskImage = `url("data:image/svg+xml,${encodeURIComponent(ICONS.star)}")`;
+            }
+
+          
+            L.polyline([stationLatLng, floatLatLng], {
+                color: '#f39c12',
+                weight: 2,
+                opacity: 0.7,
+                dashArray: '5, 5'
+            }).addTo(argoLayerGroup);
+        });
+        
+        updateArgoLegend(floats);
+    }
+
+    
+    function updateArgoLegend(floats) {
+        const legendContainer = document.getElementById('argo-legend-content');
+        const legendBar = document.getElementById('argo-legend-bar');
+        
+        if (floats.length === 0) {
+            legendBar.style.display = 'none';
+            return;
+        }
+
+        const nearestFloat = floats[0];
+        let content = `<div class="argo-legend-item"><strong>Nearest: ${nearestFloat.id} (${nearestFloat.distance.toFixed(2)} km)</strong></div>`;
+        content += '<hr style="border-color: var(--border-color); margin: 5px 0;">';
+
+        content += floats.map(float => 
+            `<div class="argo-legend-item">
+                <span class="icon" id="star-icon-${float.id}"></span>
+                <span>${float.id}: ${float.distance.toFixed(2)} km</span>
+            </div>`
+        ).join('');
+        
+        legendContainer.innerHTML = content;
+        
+      
+        floats.forEach(float => setIcon(`star-icon-${float.id}`, 'star'));
+        
+        legendBar.style.display = 'block';
+    }
+
+  
+    function clearArgoDisplay() {
+        argoLayerGroup.clearLayers();
+        document.getElementById('argo-legend-bar').style.display = 'none';
+        nearestArgoFloats = [];
+    }
+
+    
+    function downloadStationWithArgoData() {
+        const station = allStationsData.find(s => s.TraceID === currentlySelectedTraceID);
+        if (!station || nearestArgoFloats.length === 0) {
+            alert("No station or Argo float data to download.");
+            return;
+        }
+
+        const stationName = getValidName(station.Station, 'Station').replace(/[^a-z0-9]/gi, '_');
+        const filename = `Station_${stationName}_with_Nearest_Argo.csv`;
+
+        
+        const dataToExport = [];
+        
+        
+        const stationRow = {
+            DataType: 'Selected Station',
+            ID: station.TraceID,
+            StationName: station.Station,
+            ShipName: shipDisplayNameMap[normalizeShipNameKey(station.Ship)],
+            Latitude: station.parsedLat,
+            Longitude: station.parsedLon,
+            DateTime: station.Start_Time,
+            Date_Update:'-',
+            Distance_km: '-',
+            Parameters: JSON.stringify(station.Parameters || {}), 
+            minDepth: station.minDepth,
+            maxDepth: station.maxDepth,
+            coordinateStatus: station.coordinateStatus            
+        };
+        delete stationRow.parsedLat; 
+        delete stationRow.parsedLon;
+        dataToExport.push(stationRow);
+
+        
+        nearestArgoFloats.forEach(float => {
+            dataToExport.push({
+                DataType: 'Nearest Argo Profile index',
+                ID: float.id,
+                StationName: '',
+                ShipName: '',
+                Latitude: float.lat,
+                Longitude: float.lon,
+                DateTime: float.Date_time,
+                Date_Update: float.Date_update || '-',
+                Distance_km: float.distance.toFixed(4),
+                Parameters: '-',
+                minDepth: float.minDepth || '',
+                maxDepth: float.maxDepth || '',
+                coordinateStatus: 'valid'
+            });
+        });
+
+        exportToCsv(dataToExport, filename);
+    }
+
+
+    function showPlots(traceID) {
+        const station = allStationsData.find(s => s.TraceID === traceID);
+        currentStationDataForPlots = ctdDataIndex[traceID.trim()] || [];
+        
+        const shipKey = normalizeShipNameKey(station.Ship);
+        const displayName = shipDisplayNameMap[shipKey] || 'N/A';
+        document.getElementById('plot-view-title').textContent = `Showing Plots for: ${getValidName(station.Station, 'Unnamed')}`;
+        document.getElementById('plot-view-subtitle').textContent = `Ship: ${displayName} | Cruise ID: ${getValidName(station['Cruise_ID'], 'N/A')}`;
+        
+        if (currentStationDataForPlots.length === 0) {
+            showNoDataMessage();
+            return;
+        }
+
+        const plotArea = document.getElementById('plot-display-area');
+        if (!plotArea.querySelector('#main-plot-wrapper')) {
+            plotArea.innerHTML = `<div id="main-plot-wrapper"><div id="main-plot-header"><div id="main-plot-title"></div></div><div id="main-plot"></div></div><div id="plot-thumbnails-wrapper"></div>`;
+        }
+        renderPlotThumbnails();
+        displayMainPlot(PLOT_CONFIG[0]);
+    }
+
+    function renderPlotThumbnails() {
+        const container = document.getElementById('plot-thumbnails-wrapper');
+        container.innerHTML = '';
+        PLOT_CONFIG.forEach(config => {
+            const thumb = document.createElement('div');
+            thumb.className = 'thumbnail-card';
+            thumb.id = `thumb-${config.id}`;
+            thumb.innerHTML = `<div class="thumbnail-title">${config.title}</div><div class="thumbnail-desc">${config.desc}</div>`;
+            thumb.onclick = () => displayMainPlot(config);
+            container.appendChild(thumb);
+        });
+    }
+    function displayMainPlot(config) {
+        activePlotConfig = config;
+        document.querySelectorAll('.thumbnail-card').forEach(t => t.classList.remove('active'));
+        document.getElementById(`thumb-${config.id}`).classList.add('active');
+        document.getElementById('main-plot-title').textContent = config.title;
+        const { xVar, yVar, xLabel, yLabel, reverseY, id } = config;
+        const qcKey = plotQCMapping[id] || 'flag';
+
+        const traces = QC_OPTIONS.map(opt => {
+            const filteredData = currentStationDataForPlots.filter(d =>
+                String(d[qcKey]) === opt.value &&
+                d[xVar] != null && !isNaN(parseFloat(d[xVar])) &&
+                d[yVar] != null && !isNaN(parseFloat(d[yVar]))
+            );
+
+            if (filteredData.length === 0) return null;
+
+            return {
+                x: filteredData.map(d => d[xVar]), y: filteredData.map(d => d[yVar]),
+                type: 'scatter', mode: 'markers', name: opt.label,
+                marker: { color: opt.color, size: 6, line: { width: 0 } },
+                hovertemplate: `${xLabel.split(' ')[0]}: %{x:.4f}<br>${yLabel.split(' ')[0]}: %{y:.2f}m<br>Flag: ${opt.value}<extra></extra>`
+            };
+        }).filter(Boolean);
+
+        if (traces.length === 0) {
+            const plotContainer = document.getElementById('main-plot');
+            Plotly.purge(plotContainer);
+            plotContainer.innerHTML = `<div class="no-data-message" style="padding: 20px; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center;">
+                                                 <h3>No Data Found</h3>
+                                                 <p>No valid data points are available for this plot.</p>
+                                             </div>`;
+            return;
+        }
+
+        const layout = getPlotlyLayout(xLabel, yLabel, reverseY);
+        Plotly.newPlot('main-plot', traces, layout, { responsive: true, displayModeBar: false });
+    }
+    function getPlotlyLayout(xLabel, yLabel, reverseY) {
+        const styles = getComputedStyle(document.body);
+        return {
+            xaxis: {
+                title: { text: xLabel, font: { color: styles.getPropertyValue('--text-secondary') } },
+                side: reverseY ? 'top' : 'bottom',
+                showgrid: false,
+                zeroline: false,
+                linecolor: styles.getPropertyValue('--border-color'),
+                tickfont: { color: styles.getPropertyValue('--text-secondary') },
+                automargin: true
+            },
+            yaxis: {
+                title: { text: yLabel, font: { color: styles.getPropertyValue('--text-secondary') } },
+                autorange: reverseY ? 'reversed' : true,
+                showgrid: false,
+                zeroline: false,
+                linecolor: styles.getPropertyValue('--border-color'),
+                tickfont: { color: styles.getPropertyValue('--text-secondary') },
+                automargin: true
+            },
+            margin: { l: 60, r: 20, t: 40, b: 50 },
+            hovermode: 'closest',
+            paper_bgcolor: styles.getPropertyValue('--surface-1'),
+            plot_bgcolor: styles.getPropertyValue('--bg-dark'),
+            font: { color: styles.getPropertyValue('--text-primary'), family: 'var(--font-family)' },
+            showlegend: true,
+            legend: { orientation: 'h', y: -0.25, yanchor: 'top', font: { size: 10 } }
+        };
+    }
+    function showNoDataMessage() {
+        const plotArea = document.getElementById('plot-display-area');
+        plotArea.innerHTML = `<div class="no-data-message"><h3>No Profile Data</h3><p>CTD data could not be found for this station.</p></div>`;
+    }
+    function showPlotPrompt() {
+        const plotArea = document.getElementById('plot-display-area');
+        if (plotArea) {
+            plotArea.innerHTML = `<div class="plot-prompt-message"><span id="prompt-icon" class="icon" style="width: 48px; height: 48px; background-color: currentColor;"></span><h3>No Station Selected</h3><p>Select a station from the map to view its plots.</p></div>`;
+            setIcon('prompt-icon', 'prompt');
+        }
+    }
+    
+    window.addEventListener('load', () => {
+       
+        setIcon('header-icon', 'ocean');
+        setIcon('map-icon', 'map');
+        setIcon('plot-icon', 'plot');
+        setIcon('stations-icon', 'chevronRight');
+        setIcon('reset-icon', 'reset');
+        setIcon('download-icon', 'download');
+        setIcon('metadata-download-icon', 'download');
+        setIcon('filter-accordion-icon', 'chevronDown');
+        setIcon('legend-accordion-icon', 'chevronDown');
+      
+        setIcon('argo-legend-accordion-icon', 'chevronDown');
+        setIcon('argo-download-icon', 'download');
+        
+        init();
+        
+        
+        document.getElementById('reset-zoom-btn').addEventListener('click', () => {
+            if (map) map.setView([11.5, 79.5], 7);
+            drawnItems.clearLayers();
+            isDrawingModeActive = false;
+            clearStationSelection();
+        });
+        document.getElementById('download-selected-stations-btn').addEventListener('click', downloadSelectedStationsData);
+        document.getElementById('download-selected-metadata-btn').addEventListener('click', downloadSelectedMetadata);
+        
+        document.getElementById('download-argo-btn').addEventListener('click', downloadStationWithArgoData);
+
+        
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && isPanelOpen) {
+                toggleStationsPanel();
+                return; 
+            }
+            if (e.key === 'Escape') { 
+                clearStationSelection();
+            }
+            const hasDrawnItems = drawnItems && drawnItems.getLayers().length > 0;
+            if (hasDrawnItems && (e.key === 'Delete' || e.key === 'Backspace')) {
+                e.preventDefault(); 
+                drawnItems.clearLayers();
+                isDrawingModeActive = false;
+                clearStationSelection();
+            }
+        });
+        
+        const setupAccordion = (headerSelector, contentSelector, iconSelector) => {
+            const header = document.querySelector(headerSelector);
+            const content = document.querySelector(contentSelector);
+            const iconEl = document.getElementById(iconSelector);
+            header.addEventListener('click', () => {
+                const isCollapsed = content.classList.toggle('collapsed');
+                if (iconEl) setIcon(iconSelector, isCollapsed ? 'chevronDown' : 'chevronUp');
+            });
+            if (!content.classList.contains('collapsed')) {
+                 if (iconEl) setIcon(iconSelector, 'chevronUp');
+            } else {
+                 if (iconEl) setIcon(iconSelector, 'chevronDown');
+            }
+        };
+
+        
+        setupAccordion('.stations-panel .accordion-header', '.stations-panel .accordion-content', 'filter-accordion-icon');
+        setupAccordion('#legend-bar h4', '#legend-content', 'legend-accordion-icon');
+        setupAccordion('#argo-legend-bar h4', '#argo-legend-content', 'argo-legend-accordion-icon');
+
+        
+        const stationsPanel = document.getElementById('stations-panel');
+        const stationsToggle = document.getElementById('stations-toggle');
+        document.addEventListener('click', function(event) { if (isPanelOpen && !stationsPanel.contains(event.target) && !stationsToggle.contains(event.target)) { toggleStationsPanel(); } });
+        
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        themeToggleBtn.addEventListener('click', () => {
+            const isLight = document.body.classList.contains('light-mode');
+            setTheme(isLight ? 'dark' : 'light');
+        });
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        setTheme(savedTheme);
+
+        showPlotPrompt();
+    });
+    
+    Object.assign(window, { toggleStationsPanel, setFilter, selectStation, debouncedFilterStations, downloadSingleStationData, downloadSingleStationMetadata, showPlots, toggleShipVisibility, switchView, setSort, displayMainPlot });
+    </script>
+</body>
+</html>
