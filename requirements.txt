@@ -1,7 +1,7 @@
-**Leaflet.js (v1.7.1):** For the interactive map.
-**Plotly.js (v2.12.1):** For scientific data plots.
-**PapaParse (v5.3.0):** For parsing CSV data files in the browser.
-**Leaflet.draw (v1.0.4):** A plugin for drawing selection tools on the map.
+Leaflet.js (v1.7.1):For the interactive map.
+Plotly.js (v2.12.1):For scientific data plots.
+PapaParse (v5.3.0): For parsing CSV data files in the browser.
+Leaflet.draw (v1.0.4): A plugin for drawing selection tools on the map.
 pandas: DataFrame creation, CSV/Excel reading and writing
 numpy: Numerical operations, especially for QC thresholds and array logic
 os:File/folder path handling
